@@ -13,24 +13,21 @@ PORT = 9000
 sock = socket.socket()
 sock.connect((HOST, PORT))
 
-# Nhận Session ID
-msg_type, session_id, _ = unpack_message(sock.recv(1024))
-print("Session ID:", session_id)
+_, session_id, _ = unpack_message(sock.recv(1024))
+print("Session:", session_id)
 
-# HELLO
 sock.sendall(pack_message("MSG", session_id, b"HELLO"))
 
-# Nhận public key
 _, _, pubkey_bytes = unpack_message(sock.recv(4096))
 public_key = serialization.load_pem_public_key(pubkey_bytes)
 
-# Sinh AES key
 aes_key = os.urandom(32)
 
 encrypted_key = public_key.encrypt(
     aes_key,
     padding.OAEP(
         mgf=padding.MGF1(hashes.SHA256()),
+        algorithm=hashes.SHA256(),
         label=None
     )
 )
@@ -38,9 +35,21 @@ encrypted_key = public_key.encrypt(
 sock.sendall(pack_message("KEY", session_id, encrypted_key))
 print(unpack_message(sock.recv(1024))[2].decode())
 
-# VPN tunnel
-enc = encrypt_aes(aes_key, b"HELLO VPN SESSION")
-sock.sendall(pack_message("ENC", session_id, enc))
+# AUTH
+auth_msg = "AUTH|admin|123456".encode()
+sock.sendall(pack_message("ENC", session_id, encrypt_aes(aes_key, auth_msg)))
+
+_, _, resp = unpack_message(sock.recv(4096))
+result = decrypt_aes(aes_key, resp).decode()
+print("Auth result:", result)
+
+if result != "OK":
+    sock.close()
+    exit()
+
+# VPN DATA
+sock.sendall(pack_message("ENC", session_id,
+    encrypt_aes(aes_key, b"HELLO VPN AFTER AUTH")))
 
 _, _, resp = unpack_message(sock.recv(4096))
 print("Server:", decrypt_aes(aes_key, resp).decode())

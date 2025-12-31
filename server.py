@@ -6,6 +6,7 @@ from protocol import pack_message, unpack_message
 from crypto.aes_utils import encrypt_aes, decrypt_aes
 from crypto.rsa_utils import load_private_key
 from session_manager import SessionManager
+from auth import authenticate
 
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
@@ -20,10 +21,8 @@ session_manager = SessionManager()
 def handle_client(conn, addr):
     session = session_manager.create(addr, conn)
     sid = session.session_id
+    print(f"🟢 Client {addr} | Session {sid}")
 
-    print(f"Client {addr} | Session {sid}")
-
-    # Gửi session ID cho client
     conn.sendall(pack_message("SID", sid, b""))
 
     while True:
@@ -48,15 +47,32 @@ def handle_client(conn, addr):
                         label=None
                     )
                 )
-                print(f"AES key set for {sid}")
                 conn.sendall(pack_message("MSG", sid, b"OK"))
 
             elif msg_type == "ENC":
                 plaintext = decrypt_aes(session.aes_key, payload)
-                print(f"[{sid[:8]}] {plaintext.decode()}")
+                message = plaintext.decode()
 
-                response = encrypt_aes(session.aes_key, b"VPN OK")
-                conn.sendall(pack_message("ENC", sid, response))
+                # AUTH
+                if not session.authenticated:
+                    if message.startswith("AUTH|"):
+                        _, user, pw = message.split("|")
+                        if authenticate(user, pw):
+                            session.authenticated = True
+                            print(f"AUTH OK: {user}")
+                            resp = encrypt_aes(session.aes_key, b"OK")
+                        else:
+                            print(f"AUTH FAIL: {user}")
+                            resp = encrypt_aes(session.aes_key, b"FAIL")
+                            conn.sendall(pack_message("ENC", sid, resp))
+                            break
+                        conn.sendall(pack_message("ENC", sid, resp))
+                    else:
+                        break
+                else:
+                    print(f"[{sid[:8]}] {message}")
+                    resp = encrypt_aes(session.aes_key, b"VPN DATA OK")
+                    conn.sendall(pack_message("ENC", sid, resp))
 
         except Exception as e:
             print("Error:", e)
@@ -78,7 +94,7 @@ threading.Thread(target=cleanup_thread, daemon=True).start()
 server = socket.socket()
 server.bind((HOST, PORT))
 server.listen(5)
-print("VPN Server running (Session enabled)")
+print("VPN Server with AUTH running")
 
 while True:
     conn, addr = server.accept()

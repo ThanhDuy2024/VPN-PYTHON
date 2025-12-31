@@ -1,9 +1,4 @@
 def pack_message(msg_type, session_id, payload):
-    """
-    msg_type: 3 ký tự (MSG, KEY, ENC, SID)
-    session_id: UUID string (36 ký tự)
-    payload: bytes
-    """
     header = msg_type.encode().ljust(4, b' ')
     sid = session_id.encode().ljust(36, b' ')
     return header + sid + payload

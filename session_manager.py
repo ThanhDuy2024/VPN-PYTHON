@@ -1,7 +1,7 @@
 import time
-from session import Session 
+from session import Session
 
-SESSION_TIMEOUT = 60  # seconds
+SESSION_TIMEOUT = 60
 
 
 class SessionManager:
@@ -25,7 +25,6 @@ class SessionManager:
         for sid in list(self.sessions.keys()):
             session = self.sessions[sid]
             if now - session.last_active > SESSION_TIMEOUT:
-                print(f"⏱ Session timeout: {sid}")
                 try:
                     session.conn.close()
                 except:
