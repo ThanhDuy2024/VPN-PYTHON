@@ -21,7 +21,7 @@ session_manager = SessionManager()
 def handle_client(conn, addr):
     session = session_manager.create(addr, conn)
     sid = session.session_id
-    print(f"🟢 Client {addr} | Session {sid}")
+    print(f"Client {addr} | Session {sid}")
 
     conn.sendall(pack_message("SID", sid, b""))
 

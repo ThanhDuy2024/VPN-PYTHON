@@ -36,7 +36,10 @@ sock.sendall(pack_message("KEY", session_id, encrypted_key))
 print(unpack_message(sock.recv(1024))[2].decode())
 
 # AUTH
-auth_msg = "AUTH|admin|123456".encode()
+print("=====LOGIN=====");
+userName = input("Enter your user name: ")
+password = input("Enter your password: ")
+auth_msg = f"AUTH|{userName}|{password}".encode()
 sock.sendall(pack_message("ENC", session_id, encrypt_aes(aes_key, auth_msg)))
 
 _, _, resp = unpack_message(sock.recv(4096))
